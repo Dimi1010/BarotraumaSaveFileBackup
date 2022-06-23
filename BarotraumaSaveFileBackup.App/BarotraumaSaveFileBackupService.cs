@@ -70,7 +70,7 @@ namespace BarotraumaSaveFileBackup.App
 
         private async void PerformBackup(object sender, FileSystemEventArgs e)
         {
-            _logger.LogDebug("Performing backup for file: {}", e.Name);
+            _logger.LogInformation("Performing backup for file: {}", e.Name);
 
             string timestamp = DateTime.Now.ToString("yyyy-MM-dd--HH-mm-ss");
 
@@ -102,7 +102,7 @@ namespace BarotraumaSaveFileBackup.App
                 await Task.Delay(3000);
                 File.Copy(e.FullPath, newFullPath, true);
             }
-            _logger.LogDebug("Backup successful.");
+            _logger.LogInformation("Backup successful.");
         }
 
         private void HandleError(object sender, ErrorEventArgs e) => LogException(e.GetException());
