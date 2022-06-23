@@ -1,4 +1,4 @@
-# BarotraumaSaveFileBackup
+# Barotrauma Save File Backup
 Simple console application that creates backup save files with timestamp for Barotrauma when the game saves.
 
 The application monitors and creates a timestamped copy of a save every time one is overwritten.
