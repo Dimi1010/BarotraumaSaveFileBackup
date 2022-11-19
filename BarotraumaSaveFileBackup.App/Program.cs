@@ -13,7 +13,7 @@ IHost host = Host.CreateDefaultBuilder(args)
             options.BarotraumaBackupFolder = Environment.ExpandEnvironmentVariables(options.BarotraumaBackupFolder);
         });
 
-        services.AddTransient<IBackupSerializer, FileBackupSerializer>(services =>
+        services.AddTransient<IBackupSerializer, ZipArchiveBackupSerializer>(services =>
         {
             var options = services.GetRequiredService<IOptions<BarotraumaSaveFileBackupOptions>>();
 
@@ -23,7 +23,7 @@ IHost host = Host.CreateDefaultBuilder(args)
                 outputLocation = options.Value.BarotraumaSaveFileFolder;
             }
 
-            return new FileBackupSerializer(outputLocation);
+            return new ZipArchiveBackupSerializer(outputLocation);
         });
 
         services.AddHostedService<BarotraumaSaveFileBackupService>();
