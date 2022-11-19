@@ -1,5 +1,21 @@
+using Microsoft.Extensions.Options;
+
 namespace BarotraumaSaveFileBackup.App
 {
+
+    public class BarotraumaSaveFileBackupOptions
+    {
+        public const string ConfigurationKey = "BackupService";
+
+        public string BarotraumaSaveFileFolder { get; set; } = "";
+
+        public string BarotraumaBackupFolder { get; set; } = "";
+
+        public bool BackupSingleplayerSaves { get; set; } = false;
+
+        public bool BackupMultiplayerSaves { get; set; } = false;
+    }
+
     public class BarotraumaSaveFileBackupService : IHostedService
     {
         private const string SaveFileExtension = ".save";
@@ -13,28 +29,34 @@ namespace BarotraumaSaveFileBackup.App
         private readonly ILogger<BarotraumaSaveFileBackupService> _logger;
 
         public string BarotraumaSaveFileFolder { get; }
+        public string BarotraumaBackupFolder { get; }
         
         public bool BackupSingleplayerSaves { get; }
         public bool BackupMultiplayerSaves { get; }
 
         private AutoDisposableList<FileSystemWatcher> _fileSystemWatchers = new AutoDisposableList<FileSystemWatcher>();
 
-        public BarotraumaSaveFileBackupService(IConfiguration configuration, ILogger<BarotraumaSaveFileBackupService> logger)
+        public BarotraumaSaveFileBackupService(IOptions<BarotraumaSaveFileBackupOptions> options, ILogger<BarotraumaSaveFileBackupService> logger)
         {
             _logger = logger;
 
-            var backupServiceConfiguration = configuration.GetRequiredSection("BackupService");
-
-            BarotraumaSaveFileFolder = backupServiceConfiguration.GetValue<string>("BarotraumaSaveFileFolder");
-            if (BarotraumaSaveFileFolder == null)
+            BarotraumaSaveFileFolder = options.Value.BarotraumaSaveFileFolder;
+            if (string.IsNullOrWhiteSpace(BarotraumaSaveFileFolder))
                 throw new ArgumentException("BarotraumaSaveFileFolder is not set.");
 
             BarotraumaSaveFileFolder = Environment.ExpandEnvironmentVariables(BarotraumaSaveFileFolder);
             if (!Directory.Exists(BarotraumaSaveFileFolder))
                 throw new ArgumentException($"BarotraumaSaveFileFolder '{BarotraumaSaveFileFolder}' cannot be found or is not a directory.");
 
-            BackupSingleplayerSaves = backupServiceConfiguration.GetValue("BackupSingleplayerSaves", false);
-            BackupMultiplayerSaves = backupServiceConfiguration.GetValue("BackupMultiplayerSaves", false);
+            BarotraumaBackupFolder = options.Value.BarotraumaBackupFolder;
+            if (string.IsNullOrEmpty(BarotraumaBackupFolder))
+                BarotraumaBackupFolder = BarotraumaSaveFileFolder;
+
+            if (!Directory.Exists(BarotraumaBackupFolder))
+                throw new ArgumentException($"BarotraumaBackupFolder '{BarotraumaBackupFolder}' cannot be found or is not a directory.");
+
+            BackupSingleplayerSaves = options.Value.BackupSingleplayerSaves;
+            BackupMultiplayerSaves = options.Value.BackupMultiplayerSaves;
         }
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -42,7 +64,6 @@ namespace BarotraumaSaveFileBackup.App
             if (BackupSingleplayerSaves)
             {
                 _fileSystemWatchers.Add(SetupWatcher(BarotraumaSaveFileFolder, SaveFileFilter));
-                _fileSystemWatchers.Add(SetupWatcher(BarotraumaSaveFileFolder, CharacterDataFilter));
             }
 
             if (BackupMultiplayerSaves)
@@ -83,7 +104,7 @@ namespace BarotraumaSaveFileBackup.App
 
             if (newExtension == null) return;
 
-            string directory = Path.GetDirectoryName(e.FullPath);
+            string? directory = Path.GetDirectoryName(e.FullPath);
             if(directory == null)
             {
                 _logger.LogError("No parent directory found for file: {} when performing backup.", e.FullPath);
@@ -96,18 +117,27 @@ namespace BarotraumaSaveFileBackup.App
             {
                 File.Copy(e.FullPath, newFullPath, true);
             }
-            catch (IOException ex)
+            catch (Exception ex)
             {
                 _logger.LogWarning(exception: ex, "Copy operation failed. Retry in 3 seconds...");
                 await Task.Delay(3000);
-                File.Copy(e.FullPath, newFullPath, true);
+
+                try
+                {
+                    File.Copy(e.FullPath, newFullPath, true);
+                }
+                catch (Exception ex2)
+                {
+                    _logger.LogError(exception: ex2, "Copy operation failed.");
+                    return;
+                }
             }
             _logger.LogInformation("Backup successful.");
         }
 
         private void HandleError(object sender, ErrorEventArgs e) => LogException(e.GetException());
 
-        private void LogException(Exception ex) => _logger.LogError(exception: ex, message: null);
+        private void LogException(Exception ex) => _logger.LogError(exception: ex, message: "FileSystemWatcher threw an exception.");
 
         private FileSystemWatcher SetupWatcher(string path, string fileFilter, bool enabled = false)
         {
@@ -118,6 +148,7 @@ namespace BarotraumaSaveFileBackup.App
 
             try
             {
+                // TODO: Check if created makes the event fire twice.
                 watcher.Created += PerformBackup;
                 watcher.Changed += PerformBackup;
                 watcher.Error += HandleError;
@@ -126,7 +157,7 @@ namespace BarotraumaSaveFileBackup.App
                 watcher.EnableRaisingEvents = enabled;
                 return watcher;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 watcher.Dispose();
                 throw;
