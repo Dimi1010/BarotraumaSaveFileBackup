@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-BarotraumaSaveFileBackup.App-05205686-A266-4836-965E-6BCA4D7C846D</UserSecretsId>
+    <Version>$(VersionPrefix)0.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

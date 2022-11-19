@@ -1,6 +1,7 @@
 using BarotraumaSaveFileBackup.App;
 using BarotraumaSaveFileBackup.App.Serialization;
 using Microsoft.Extensions.Options;
+using System.Reflection;
 
 IHost host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
@@ -20,6 +21,7 @@ IHost host = Host.CreateDefaultBuilder(args)
             return new ZipArchiveBackupSerializer(outputLocation);
         });
 
+        services.AddHostedService<VersionCheckerService>();
         services.AddHostedService<BarotraumaSaveFileBackupService>();
     })
     .Build();
