@@ -97,26 +97,54 @@ namespace BarotraumaSaveFileBackup.App
                 }
                 else
                 {
-                    _logger.LogInformation("Queueing backup operation for savefile {}. Backup will start in 3 seconds.", e.Name);
+                    _logger.LogInformation("Queueing backup operation for savefile {}. Backup will start in 5 seconds.", e.Name);
                     _activeBackups.Add(e.Name);
                 }
             }
 
-            // 3 seconds delay to hopefully have the game process and write all its files.
-            await Task.Delay(3000);
-
-            _logger.LogInformation("Performing backup for savefile: {}", e.Name);
-
-            var saveFile = e.FullPath;
-            var characterData = multiplayer ? $"{Path.GetFileNameWithoutExtension(e.FullPath)}_CharacterData.xml" : null;
-
-            await _backupSerializer.SerializeAsync(saveFile, characterData);
-
-            lock (_activeBackups)
+            try
             {
-                _activeBackups.Remove(e.Name);
-            }
+                // 5 seconds delay to hopefully have the game process and write all its files.
+                await Task.Delay(5000);
 
+                _logger.LogInformation("Performing backup for savefile: {}", e.Name);
+
+                var saveFile = e.FullPath;
+                var characterData = multiplayer ? 
+                    $"{Path.GetDirectoryName(e.FullPath)}{Path.DirectorySeparatorChar}{Path.GetFileNameWithoutExtension(e.FullPath)}_CharacterData.xml" 
+                    : null;
+
+                _logger.LogTrace("Save operation started with:\nSavefile Path: {}\nCharacter Data Path: {}", saveFile, characterData);
+
+                if (characterData != null)
+                {
+                    for(var attempts = 1; attempts <= 3; attempts++)
+                    {
+                        if (!File.Exists(characterData))
+                        {
+                            var retrySeconds = 2;
+                            _logger.LogWarning("Character data not found. Retrying in {} seconds...", retrySeconds);
+                            await Task.Delay(retrySeconds * 1000);
+                        }
+                    }
+
+                    if(!File.Exists(characterData))
+                    {
+                        _logger.LogError("Character data not found. Backup cancelled.");
+                        return;
+                    }
+                }
+
+                await _backupSerializer.SerializeAsync(saveFile, characterData);
+            }
+            finally
+            {
+                lock (_activeBackups)
+                {
+                    _activeBackups.Remove(e.Name);
+                }
+            }
+            
             _logger.LogInformation("Backup successful.");
         }
 
