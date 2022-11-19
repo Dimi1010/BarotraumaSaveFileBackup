@@ -4,11 +4,11 @@
     {
         private const string BackupExtension = ".bak";
 
-        private readonly string _outputLocation;
+        private readonly string? _outputLocation;
 
-        public FileBackupSerializer(string outputLocation)
+        public FileBackupSerializer(string? outputLocation)
         {
-            if (!Directory.Exists(outputLocation))
+            if (string.IsNullOrEmpty(outputLocation) && !Directory.Exists(outputLocation))
                 throw new ArgumentException($"'{outputLocation}' cannot be found or is not a directory.", nameof(outputLocation));
             _outputLocation = outputLocation;
         }
@@ -46,12 +46,26 @@
                 var fileExtension = Path.GetExtension(file);
 
                 var newFileName = $"{baseFileName}-{timestamp}{fileExtension}{BackupExtension}";
-                var newFullPath = Path.Combine(_outputLocation, newFileName);
+                var newFullPath = Path.Combine(GetOutputDirectory(file), newFileName);
 
                 File.Copy(file, newFullPath);
             }
 
             return Task.CompletedTask;
+        }
+
+        private string GetOutputDirectory(string file)
+        {
+            if (string.IsNullOrEmpty(_outputLocation))
+            {
+                var saveFileDir = Path.GetDirectoryName(file);
+
+                if (saveFileDir == null)
+                    throw new DirectoryNotFoundException("Output directory is not set and can't be calculated based on the file.");
+
+                return saveFileDir;
+            }
+            return _outputLocation;
         }
     }
 }
