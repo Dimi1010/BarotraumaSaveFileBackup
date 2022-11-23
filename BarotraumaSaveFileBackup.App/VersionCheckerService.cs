@@ -15,6 +15,7 @@
             if(latestVersion is null)
             {
                 _logger.LogError("Latest product version could not be obtained.");
+                return;
             }
 
             if(latestVersion > ProductInfo.ProductVersion)
